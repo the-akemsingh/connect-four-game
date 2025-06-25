@@ -1,1 +1,1 @@
-{"root":["./src/index.ts","./src/utils/game.ts","./src/utils/gamemanager.ts","./src/utils/messagetypes.ts"],"version":"5.8.3"}
+{"root":["./src/index.ts","./src/prismaclient.ts","./src/utils/game.ts","./src/utils/gamemanager.ts","./src/utils/messagetypes.ts"],"version":"5.8.3"}

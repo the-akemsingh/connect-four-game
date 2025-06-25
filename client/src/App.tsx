@@ -1,14 +1,22 @@
 import { useEffect, useState } from "react";
 import useSocket from "./hooks/useSocket";
 import Slot from "./components/slot";
+import axios from "axios";
+
+interface Record {
+  id: string;
+  player1: string;
+  player2: string;
+  winner: string;
+  createdAt: string;
+}
 
 function App() {
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [isWaiting, setIsWaiting] = useState<boolean>(false);
   const [playerName, setPlayerName] = useState<string | null>(null);
   const [myColor, setMyColor] = useState<string | null>(null);
-  const [gameId, setGameId] = useState<string | null>(null);
-  // const [opponentName, setOpponentName] = useState<string | null>(null);
+  const [viewLeaderboard, setViewLeaderboard] = useState<boolean>(false);
   const [game, setGame] = useState<string[][]>([
     ["", "", "", "", "", "", ""],
     ["", "", "", "", "", "", ""],
@@ -20,8 +28,30 @@ function App() {
   const [movesCount, setMovesCount] = useState<number>(0);
   const [winner, setWinner] = useState<string | null>(null);
   const [isDraw, setIsDraw] = useState<boolean>(false);
+  const [opponentLeft, setOpponentLeft] = useState<boolean>(false);
+  const [record, setRecord] = useState<Record[] | null>(null);
 
   const socket = useSocket();
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        console.log("Fetching leaderboard from:", `${BACKEND_URL}/leaderboard`);
+        const response = await axios.get(`${BACKEND_URL}/leaderboard`);
+        if (response.status === 200) {
+          //@ts-ignore
+          setRecord(response.data);
+          console.log("Leaderboard fetched successfully:", response.data);
+        } else {
+          console.error("Failed to fetch leaderboard");
+        }
+      } catch (error) {
+        console.error("Error fetching leaderboard:", error);
+      }
+    };
+    fetchLeaderboard();
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
@@ -31,7 +61,6 @@ function App() {
         case "INIT_GAME":
           setIsStarted(true);
           setIsWaiting(false);
-          setGameId(message.gameId);
           setMyColor(message.color);
           localStorage.setItem("connectFour-gameId", message.gameId);
           break;
@@ -45,7 +74,9 @@ function App() {
           setMovesCount((prevCount) => prevCount + 1);
           break;
         case "OPPONENT_LEFT":
+          console.error("my color", myColor)
           setWinner(myColor);
+          setOpponentLeft(true);
           break;
         case "GAME_OVER":
           setWinner(message.winner);
@@ -55,8 +86,11 @@ function App() {
           break;
       }
     }
-  }, [socket])
+  }, [socket, myColor])
 
+  const viewLeaderboardHandler = () => {
+    setViewLeaderboard(true);
+  }
 
   const startGameHandler = () => {
     try {
@@ -119,7 +153,7 @@ function App() {
       </div>
     );
   }
-  else if (!isStarted) {
+  else if (!isStarted && !isWaiting && !viewLeaderboard) {
     return (
       <div className="min-h-screen flex  justify-center bg-gray-100">
         <div className="mt-20 flex flex-col items-center space-y-4">
@@ -128,6 +162,7 @@ function App() {
           </span>
           <input className="border" onChange={(e) => setPlayerName(e.target.value)} type="text" placeholder="enter your name" />
           <button onClick={startGameHandler} className="bg-blue-600 text-white py-2 px-4 rounded cursor-pointer">Join Game</button>
+          <button onClick={viewLeaderboardHandler} className="bg-blue-600 text-white py-2 px-4 rounded cursor-pointer">View LeaderBoard</button>
         </div>
       </div>
     )
@@ -138,6 +173,49 @@ function App() {
         <div className="text-2xl font-bold text-blue-600">
           Searching opponent...
         </div>
+      </div>
+    );
+  }
+  else if (viewLeaderboard) {
+    return (
+      <div className="min-h-screen flex flex-col justify-center items-center bg-gray-100 p-6">
+        <div className="mb-6 text-3xl font-bold text-blue-600">
+          Leaderboard
+        </div>
+
+        {record && record.length > 0 ? (
+          <div className="w-full max-w-3xl overflow-x-auto">
+            <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+              <thead className="bg-blue-500 text-white">
+                <tr>
+                  <th className="py-3 px-4 text-left">Player 1</th>
+                  <th className="py-3 px-4 text-left">Player 2</th>
+                  <th className="py-3 px-4 text-left">Winner</th>
+                  <th className="py-3 px-4 text-left">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {record.map((game) => (
+                  <tr key={game.id} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4">{game.player1}</td>
+                    <td className="py-3 px-4">{game.player2}</td>
+                    <td className="py-3 px-4 font-medium">{game.winner}</td>
+                    <td className="py-3 px-4">{new Date(game.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-lg text-gray-600">No game records found</div>
+        )}
+
+        <button
+          onClick={() => setViewLeaderboard(false)}
+          className="mt-6 bg-blue-600 text-white py-2 px-4 rounded cursor-pointer hover:bg-blue-700"
+        >
+          Back
+        </button>
       </div>
     );
   }
@@ -160,6 +238,9 @@ function App() {
           ) : (
             <div className="text-2xl font-bold text-red-600">You Lose!</div>
           )
+        )}
+        {opponentLeft && (
+          <div className="text-2xl font-bold text-red-600">Opponent Left the Game!</div>
         )}
         {isDraw && (
           <div className="text-2xl font-bold text-yellow-600">It's a Draw!</div>

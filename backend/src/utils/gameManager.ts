@@ -1,6 +1,7 @@
 import { WebSocket } from "ws";
 import { Game } from "./game";
 import { INIT_GAME, MOVE, OPPONENT_LEFT } from "./messageTypes";
+import prisma from "../prismaClient";
 
 export class GameManager {
   private static instance: GameManager;
@@ -70,7 +71,7 @@ export class GameManager {
           console.error("Unknown message type:", message.type);
         }
       });
-      socket.on("close", () => {
+      socket.on("close", async () => {
         //remove the player from all games
         //notify the other player
         this.allPlayers.delete(socket);
@@ -78,21 +79,38 @@ export class GameManager {
           this.pendingPlayer = null;
         }
 
-        this.games = this.games.filter((game) => {
-          if (game.Player1 === socket || game.Player2 === socket) {
-            const opponent =
-              game.Player1 === socket ? game.Player2 : game.Player1;
-            if (opponent.readyState === WebSocket.OPEN) {
-              opponent.send(
-                JSON.stringify({
-                  type: OPPONENT_LEFT,
-                })
-              );
-            }
-            return false;
-          }
-          return true;
+        const game = this.games.find((game) => {
+          return game.Player1 === socket || game.Player2 === socket;
         });
+
+        if (game) {
+          const opponent =
+            game.Player1 === socket ? game.Player2 : game.Player1;
+          if (opponent.readyState === WebSocket.OPEN) {
+            opponent.send(
+              JSON.stringify({
+                type: OPPONENT_LEFT,
+              })
+            );
+          }
+
+          // Only create a record if the game wasn't already completed
+          const gameIndex = this.games.indexOf(game);
+          if (gameIndex !== -1) {
+            // Create a record only if a player leaves mid-game
+            const record = await prisma.record.create({
+              data: {
+                player1: game.player1Name,
+                player2: game.player2Name,
+                winner: game.Player1 === socket ? game.player2Name : game.player1Name,
+              },
+            });
+            console.log("Game record created due to player disconnect:", record);
+
+            // Remove the game from the active games list
+            this.games.splice(gameIndex, 1);
+          }
+        }
       });
     } catch (e) {
       console.error("Error adding user to game:", e);

@@ -1,11 +1,15 @@
 import { WebSocket } from "ws";
 import { GAME_DRAW, GAME_OVER, INIT_GAME, MOVE } from "./messageTypes";
+import { v4 as uuidv4 } from "uuid";
+import prisma from "../prismaClient";
 
 export class Game {
   public Player1: WebSocket;
   public Player2: WebSocket;
   public player1Name: string;
   public player2Name: string;
+  public player1Id: string;
+  public player2Id: string;
   public gameId: string;
   private game: string[][] = [];
   private movesCount: number;
@@ -34,11 +38,14 @@ export class Game {
       ["", "", "", "", "", "", ""],
       ["", "", "", "", "", "", ""],
     ];
+    this.player1Id = uuidv4();
+    this.player2Id = uuidv4();
     this.Player1.send(
       JSON.stringify({
         type: INIT_GAME,
         color: "red",
         gameId: this.gameId,
+        playerId: this.player1Id,
       })
     );
     this.Player2.send(
@@ -46,6 +53,7 @@ export class Game {
         type: INIT_GAME,
         color: "black",
         gameId: this.gameId,
+        playerId: this.player2Id,
       })
     );
     this.movesCount = 0;
@@ -99,6 +107,15 @@ export class Game {
               gameId: this.gameId,
             })
           );
+          const record = await prisma.record.create({
+            data: {
+              player1: this.player1Id,
+              player2: this.player2Id,
+              winner:
+                socket === this.Player1 ? this.player1Name : this.player2Name,
+            },
+          });
+          console.log("Game record created:", record);
         } else {
           // Draw
           this.Player1.send(
@@ -115,6 +132,14 @@ export class Game {
               gameId: this.gameId,
             })
           );
+          const record = await prisma.record.create({
+            data: {
+              player1: this.player1Id,
+              player2: this.player2Id,
+              winner: "draw",
+            },
+          });
+          console.log("Game record created:", record);
         }
       } else {
         //sending the updated game state to opponent
