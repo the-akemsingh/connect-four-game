@@ -5,7 +5,13 @@ import { GameManager } from "./utils/gameManager";
 import prisma from "./prismaClient";
 
 const app = express();
-app.use(cors());
+app.use(cors(
+  {
+    origin: ['http://localhost:3000', 'https://connect-four-game-two.vercel.app'],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+));
 app.use(express.json());
 
 const httpServer = app.listen(3000, () => {
