@@ -1,0 +1,9 @@
+{
+    "version": 2,
+  
+    "rewrites": [{ "source": "/(.*)", "destination": "/" }],
+    "env": {
+      "VITE_WS_URL": "wss://silly-sawine-000fe5.netlify.app/",
+      "VITE_BACKEND_URL":"https://silly-sawine-000fe5.netlify.app/"
+    }
+  }
